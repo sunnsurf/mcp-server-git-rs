@@ -28,7 +28,7 @@ pub fn git_status(repo: &Repository) -> Result<String> {
     let head_name = repo
         .head()
         .ok()
-        .and_then(|r| r.shorthand().map(str::to_owned))
+        .and_then(|r| r.shorthand().ok().map(str::to_owned))
         .unwrap_or_else(|| "HEAD (unborn)".into());
 
     let mut staged = Vec::new();
@@ -328,7 +328,7 @@ pub fn git_create_branch(
             let name = head
                 .shorthand()
                 .map(str::to_owned)
-                .unwrap_or_else(|| "HEAD".into());
+                .unwrap_or_else(|_| "HEAD".into());
             (head.peel_to_commit()?, name)
         }
     };
@@ -355,7 +355,7 @@ pub fn git_checkout(repo: &Repository, branch_name: &str) -> Result<String> {
         Some(gref) => {
             let name = gref
                 .name()
-                .ok_or_else(|| anyhow!("reference has no name"))?
+                .map_err(|_| anyhow!("reference has no name"))?
                 .to_owned();
             repo.set_head(&name).context("failed to set HEAD")?;
         }
@@ -444,7 +444,7 @@ pub fn git_branch(
     let head_shorthand = repo
         .head()
         .ok()
-        .and_then(|h| h.shorthand().map(str::to_owned));
+        .and_then(|h| h.shorthand().ok().map(str::to_owned));
 
     let mut lines = Vec::new();
     for b in repo.branches(filter)? {

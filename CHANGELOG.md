@@ -10,6 +10,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Bumped `rmcp` from 1.5 to 3.5.1. `tools/list` now builds its result via
   `ListToolsResult::with_all_items`; wire output is unchanged (same 52 tools,
   no pagination cursor).
+- Bumped `git2` from 0.20 to 0.21 (vendored libgit2 1.9.7). The `ssh` and
+  `https` features, no longer on by default in git2, are enabled explicitly
+  so push, fetch and ls-remote keep both transports. Non-UTF-8 names, paths
+  and messages are handled exactly as before.
 
 ### Fixed
 - `initialize` now reports `serverInfo` as `mcp-server-git-rs` with this

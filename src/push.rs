@@ -26,7 +26,7 @@ pub fn git_push(repo: &Repository, args: PushArgs<'_>) -> Result<String> {
         None => {
             let head = repo.head().context("failed to resolve HEAD")?;
             head.shorthand()
-                .ok_or_else(|| anyhow!("detached HEAD: pass branch explicitly"))?
+                .map_err(|_| anyhow!("detached HEAD: pass branch explicitly"))?
                 .to_owned()
         }
     };

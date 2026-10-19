@@ -335,7 +335,7 @@ fn checkout_switches_branch() {
     git_create_branch(&f.repo, "feature", None).unwrap();
     let out = git_checkout(&f.repo, "feature").unwrap();
     assert!(out.contains("feature"), "got: {out}");
-    assert_eq!(f.repo.head().unwrap().shorthand(), Some("feature"));
+    assert_eq!(f.repo.head().unwrap().shorthand().unwrap(), "feature");
 }
 
 #[test]

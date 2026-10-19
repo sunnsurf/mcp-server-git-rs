@@ -9,7 +9,7 @@ use crate::push::auth_callback;
 pub fn git_remote_list(repo: &Repository) -> Result<String> {
     let names = repo.remotes().context("failed to list remotes")?;
     let mut out = Vec::new();
-    for n in names.iter().flatten() {
+    for n in names.iter().filter_map(|n| n.ok().flatten()) {
         let r = repo
             .find_remote(n)
             .with_context(|| format!("failed to load remote {n:?}"))?;

@@ -12,7 +12,10 @@ pub fn git_tag_list(repo: &Repository, pattern: Option<&str>) -> Result<String> 
         reject_flag_arg("pattern", p)?;
     }
     let names = repo.tag_names(pattern).context("failed to list tags")?;
-    let mut out: Vec<String> = names.iter().filter_map(|n| n.map(str::to_owned)).collect();
+    let mut out: Vec<String> = names
+        .iter()
+        .filter_map(|n| n.ok().flatten().map(str::to_owned))
+        .collect();
     out.sort();
     Ok(out.join("\n"))
 }
