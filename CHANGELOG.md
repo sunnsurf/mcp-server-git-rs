@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Bumped `rmcp` from 1.5 to 3.5.1. `tools/list` now builds its result via
+  `ListToolsResult::with_all_items`; wire output is unchanged (same 52 tools,
+  no pagination cursor).
+
 ## [0.2.1] – 2026-04-25
 
 ### Fixed

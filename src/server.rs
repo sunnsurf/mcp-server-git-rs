@@ -1562,11 +1562,7 @@ impl ServerHandler for GitServer {
                 None => true,
             })
             .collect();
-        Ok(ListToolsResult {
-            tools,
-            meta: None,
-            next_cursor: None,
-        })
+        Ok(ListToolsResult::with_all_items(tools))
     }
 
     fn get_tool(&self, name: &str) -> Option<Tool> {
