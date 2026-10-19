@@ -81,7 +81,7 @@ pub fn git_tag_push(
     {
         let failures = Rc::clone(&failures);
         let mut cbs = RemoteCallbacks::new();
-        cbs.credentials(auth_callback);
+        cbs.credentials(auth_callback());
         cbs.push_update_reference(move |refname, status| {
             if let Some(msg) = status {
                 failures

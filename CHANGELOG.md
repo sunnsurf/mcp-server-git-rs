@@ -16,6 +16,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and messages are handled exactly as before.
 
 ### Fixed
+- SSH remote operations (`git_push`, `git_fetch`, `git_ls_remote`,
+  `git_tag_push`) no longer hang when no ssh-agent is running. libgit2
+  re-invokes the credentials callback after every rejection, and
+  `ssh_key_from_agent` succeeds even without an agent, so the old callback
+  looped forever. Each auth source is now tried at most once per operation;
+  a rejected HTTPS credential moves on to the next source in the chain
+  instead of being retried.
+- `git_fetch`, `git_ls_remote` and `git_remote_prune` errors now include the
+  underlying cause (e.g. `connect to origin failed: SSH auth failed: ...`),
+  matching `git_push`.
 - `initialize` now reports `serverInfo` as `mcp-server-git-rs` with this
   crate's version, instead of rmcp's own crate name and version.
 - `git_add` now follows `git add -- <pathspec>` semantics, matching the
