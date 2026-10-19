@@ -1546,8 +1546,9 @@ impl GitServer {
 /// Manual `ServerHandler` impl: we override `list_tools` and `get_tool` to
 /// hide tools whose feature group is disabled. `call_tool` is auto-generated
 /// by `#[tool_handler]`; per-tool `require_feature` early-returns handle the
-/// "called a hidden tool anyway" case.
-#[tool_handler]
+/// "called a hidden tool anyway" case. `name` overrides the default
+/// `serverInfo` (rmcp's own crate name) so clients see this server's identity.
+#[tool_handler(name = "mcp-server-git-rs")]
 impl ServerHandler for GitServer {
     async fn list_tools(
         &self,
@@ -1592,6 +1593,13 @@ mod tests {
         assert_eq!(tool_feature("git_worktree_add"), Some(Feature::Worktrees));
         assert_eq!(tool_feature("git_grep"), Some(Feature::Notes));
         assert_eq!(tool_feature("nonexistent"), None);
+    }
+
+    #[test]
+    fn server_info_reports_crate_identity() {
+        let info = GitServer::new(Vec::new(), FeatureSet::empty()).get_info();
+        assert_eq!(info.server_info.name, "mcp-server-git-rs");
+        assert_eq!(info.server_info.version, env!("CARGO_PKG_VERSION"));
     }
 
     #[test]

@@ -11,6 +11,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ListToolsResult::with_all_items`; wire output is unchanged (same 52 tools,
   no pagination cursor).
 
+### Fixed
+- `initialize` now reports `serverInfo` as `mcp-server-git-rs` with this
+  crate's version, instead of rmcp's own crate name and version.
+
 ## [0.2.1] – 2026-04-25
 
 ### Fixed
