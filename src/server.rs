@@ -68,7 +68,9 @@ pub struct CommitParams {
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct AddParams {
     pub repo_path: String,
-    /// Paths to stage. Pass `["."]` to stage everything.
+    /// Paths to stage: files, directories or globs. Tracked paths missing from
+    /// the working tree stage their removal. Pass `["."]` to stage everything.
+    #[schemars(length(min = 1))]
     pub files: Vec<String>,
 }
 

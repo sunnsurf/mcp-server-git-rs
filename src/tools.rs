@@ -1,10 +1,11 @@
 use anyhow::{anyhow, bail, Context, Result};
 use git2::{
-    BranchType, DiffFormat, DiffLineType, DiffOptions, IndexAddOption, ObjectType, Repository,
-    Status, StatusOptions,
+    BranchType, DiffFormat, DiffLineType, DiffOptions, Index, IndexAddOption, ObjectType, Oid,
+    Pathspec, PathspecFlags, Repository, Status, StatusOptions,
 };
+use std::collections::HashSet;
 use std::fmt::Write;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use crate::guard::{reject_flag_arg, require_revparse};
 
@@ -180,24 +181,119 @@ pub fn git_commit(repo: &Repository, message: &str) -> Result<String> {
     Ok(format!("Changes committed successfully with hash {oid}"))
 }
 
+/// Stage paths with `git add -- <pathspec>...` semantics: directories recurse,
+/// globs expand, and tracked paths missing from the working tree stage their
+/// removal (so a directory rename is `["old", "new"]`). Every path is
+/// validated before the index is touched, so one bad entry stages nothing.
 pub fn git_add(repo: &Repository, files: &[String]) -> Result<String> {
-    let mut index = repo.index()?;
-    if files == ["."] {
-        index
-            .add_all(["."].iter(), IndexAddOption::DEFAULT, None)
-            .context("failed to add all files")?;
-    } else {
-        for f in files {
-            if f.starts_with('-') {
-                bail!("file path must not start with '-': {f:?}");
-            }
-            index
-                .add_path(Path::new(f))
-                .with_context(|| format!("failed to stage {f}"))?;
+    if files.is_empty() {
+        bail!("No files provided to stage. Pass one or more paths, or ['.'] to stage everything.");
+    }
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| anyhow!("cannot stage files in a bare repository"))?;
+    let root = workdir
+        .canonicalize()
+        .with_context(|| format!("failed to resolve {}", workdir.display()))?;
+
+    let mut specs = Vec::with_capacity(files.len());
+    for f in files {
+        if f.starts_with('-') {
+            bail!("file path must not start with '-': {f:?}");
         }
+        specs.push(repo_relative_pathspec(&root, f)?);
+    }
+
+    let mut index = repo.index()?;
+    // A pathspec counts as matched if it hits the working tree (new or
+    // modified files) or the index (tracked files, including deleted ones).
+    // Ignored, untracked paths match neither. libgit2's matcher doesn't treat
+    // "." as the whole tree, but the root always matches in git.
+    let ps = Pathspec::new(specs.iter())?;
+    let in_workdir = ps.match_workdir(repo, PathspecFlags::FIND_FAILURES)?;
+    let in_index = ps.match_index(&index, PathspecFlags::FIND_FAILURES)?;
+    let workdir_failures: HashSet<&[u8]> = in_workdir.failed_entries().collect();
+    let index_failures: HashSet<&[u8]> = in_index.failed_entries().collect();
+    for (f, spec) in files.iter().zip(&specs) {
+        let key = spec.as_bytes();
+        if spec == "." || !(workdir_failures.contains(key) && index_failures.contains(key)) {
+            continue;
+        }
+        if repo.is_path_ignored(spec)? {
+            bail!("The following paths are ignored by one of your .gitignore files:\n{f}");
+        }
+        bail!("pathspec '{f}' did not match any files");
+    }
+
+    let before = index_snapshot(&index);
+    index
+        .add_all(specs.iter(), IndexAddOption::DEFAULT, None)
+        .context("failed to stage files")?;
+    // Staging can succeed without changing anything (e.g. '.' on a clean
+    // tree), so compare the index rather than trusting the call.
+    if index_snapshot(&index) == before {
+        return Ok(
+            "No changes were staged: the given paths had nothing new to stage. \
+             git_status shows what is modified or untracked."
+                .into(),
+        );
     }
     index.write()?;
     Ok("Files staged successfully".into())
+}
+
+/// Turn a user-supplied path (relative to the repo root, or absolute) into a
+/// repo-relative pathspec, rejecting anything that resolves outside the
+/// working tree. Like Python's non-strict `Path.resolve()`, it tolerates paths
+/// that no longer exist (deleted files, globs) by canonicalising the longest
+/// existing ancestor.
+fn repo_relative_pathspec(root: &Path, f: &str) -> Result<String> {
+    let mut lexical = PathBuf::new();
+    for c in root.join(f).components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                lexical.pop();
+            }
+            other => lexical.push(other),
+        }
+    }
+
+    let mut existing = lexical.as_path();
+    let mut tail = Vec::new();
+    let resolved = loop {
+        if let Ok(canon) = existing.canonicalize() {
+            break tail.iter().rev().fold(canon, |acc, name| acc.join(name));
+        }
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                tail.push(name);
+                existing = parent;
+            }
+            _ => bail!("Invalid path: '{f}'"),
+        }
+    };
+
+    let rel = resolved
+        .strip_prefix(root)
+        .map_err(|_| anyhow!("Path '{f}' is outside the repository '{}'", root.display()))?;
+    let parts = rel
+        .components()
+        .map(|c| c.as_os_str().to_str())
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| anyhow!("Invalid path: '{f}'"))?;
+    Ok(if parts.is_empty() {
+        ".".into()
+    } else {
+        parts.join("/")
+    })
+}
+
+fn index_snapshot(index: &Index) -> Vec<(Vec<u8>, Oid, u32, u16)> {
+    index
+        .iter()
+        .map(|e| (e.path, e.id, e.mode, e.flags))
+        .collect()
 }
 
 pub fn git_reset(repo: &Repository) -> Result<String> {

@@ -14,6 +14,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 - `initialize` now reports `serverInfo` as `mcp-server-git-rs` with this
   crate's version, instead of rmcp's own crate name and version.
+- `git_add` now follows `git add -- <pathspec>` semantics, matching the
+  Python reference: directories recurse, globs expand, and tracked paths
+  missing from the working tree stage their removal, so a directory rename
+  stages in one call (`["olddir", "newdir"]`). `./path`, `dir/` and absolute
+  paths inside the repository are accepted. Previously only existing regular
+  files (or `["."]`) could be staged.
+- `git_add` parity with the Python reference: an empty `files` list is
+  rejected (schema `minItems: 1`), paths resolving outside the repository
+  report `Path '...' is outside the repository '...'`, a call that changes
+  nothing returns `No changes were staged...`, and unmatched or ignored paths
+  error with git's wording. All paths are validated first, so one bad entry
+  stages nothing.
 
 ## [0.2.1] – 2026-04-25
 
